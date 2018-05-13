@@ -247,16 +247,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         busCurSpeed = busDis / intervalTime;
 
                         speedSum += busCurSpeed;
+                        prevDistTrav = currentDistanceTravelled;
 
+                        currentDistanceTravelled += busDis;
                         busCurAvgSpeed = speedSum / (k);
                     }
 
-                    routeDistance = (Haversine.distance(busStartLat, busStartLongi, busMid1Lat, busMid1Lat)+
+                    routeDistance = (Haversine.distance(busStartLat, busStartLongi, busMid1Lat, busMid1Longi)+
                                     Haversine.distance(busMid1Lat, busMid1Longi, busMid2Lat, busMid2Longi)+
                                     Haversine.distance(busMid2Lat, busMid2Longi, busEndLat, busEndLongi) );
 
-                    currentDistanceTravelled = Haversine.distance(busStartLat, busStartLongi, lat, lon);
-                    prevDistTrav = Haversine.distance(busStartLat, busStartLongi, new BigDecimal(displacementsList.get(k - 2).getPoints().getLatti()), new BigDecimal(displacementsList.get(k - 2).getPoints().getLongi()));
+                    //currentDistanceTravelled = Haversine.distance(busStartLat, busStartLongi, lat, lon);
+                    //prevDistTrav = Haversine.distance(busStartLat, busStartLongi, new BigDecimal(displacementsList.get(k - 2).getPoints().getLatti()), new BigDecimal(displacementsList.get(k - 2).getPoints().getLongi()));
 
                     timeTravelledThus = displacementsList.get(k - 1).getTimeThus();
                     long prevTime = displacementsList.get(k - 2).getTimeThus();
