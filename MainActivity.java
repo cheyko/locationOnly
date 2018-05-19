@@ -47,10 +47,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             busMid2Longi,busEndLat, busEndLongi ;
     private int numEntered;
 
-    private DatabaseReference ref,routeRef;
+    private DatabaseReference ref,routeRef,schedulRef;
     ListView listViewDisplacements;
-    public List<Displacements> displacementsList;
-    public List<Displacements> routeList;
+    public List<Displacements> displacementsList,routeList;
+    public List<RouteTrip> scheduleList;
 
     public Date currentTime, startTime;
     public EditText busNumber;
@@ -69,7 +69,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         displacementsList = new ArrayList<>();
         routeList = new ArrayList<>();
-
+        scheduleList = new ArrayList<>();
         speedSum += SPEED_LIMIT;
 
         busNumber = findViewById(R.id.busnumber);
@@ -79,6 +79,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         // Get a reference to our posts
         ref = FirebaseDatabase.getInstance().getReference("displacements");
         routeRef = FirebaseDatabase.getInstance().getReference("routes");
+        schedulRef = FirebaseDatabase.getInstance().getReference("schedule");
         currentTime = Calendar.getInstance().getTime();
         //theDatabase = FirebaseDatabase.getInstance().getReference("displacements");
     }
@@ -110,48 +111,74 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         });
 
+        schedulRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+
+                scheduleList.clear();
+                for(DataSnapshot routeSnapshot : dataSnapshot.getChildren()){
+
+                    RouteTrip scheduleDetail = routeSnapshot.getValue(RouteTrip.class);
+                    scheduleList.add(scheduleDetail);
+
+                }
+
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                System.out.println("The read failed: " + databaseError.getCode());
+            }
+        });
     }
 
-    public void isBefitting(double prevDist, double totalDistance, long expectingTime,
+    public void isBefitting(double prevDist, double totalDistance,
                             long timeThus,long prevTime, double curDisTrav, double avgBusSpeed){
 
 
+        double prevDistanceLeft = totalDistance - prevDist;
         double distanceLeft = totalDistance - curDisTrav;
+        long timeLeft = (long) (distanceLeft / avgBusSpeed);
+        long prevTimeLeft = (long) (prevDistanceLeft / (prevDist/prevTime));
 
+        Toast.makeText(this," expected time left for bus: "+ timeLeft,Toast.LENGTH_LONG).show();
+        long diff = prevTimeLeft - timeLeft;
+
+        /*
         if (prevDist == 0){
             expectedCurTime = (long)((curDisTrav/totalDistance) * expectingTime);
             }
         else if (prevDist != 0){
             expectedCurTime = (long)((curDisTrav/prevDist) * prevTime);
-        }
-
-        long timeLeft = (long) (distanceLeft / avgBusSpeed);
-        Toast.makeText(this," expected time left for bus: "+ timeLeft,Toast.LENGTH_LONG).show();
-
+        }*/
 
         String testing = new String ();
 
-
-        if (expectedCurTime == timeThus){//(calculatedTime == (expectingTime - timeThus)){
+        if (diff == (timeThus-prevTime)){//(calculatedTime == (expectingTime - timeThus)){
 
             Toast.makeText(this,"Bus on perfect timing",Toast.LENGTH_LONG).show();
 
-        }else if(expectedCurTime > timeThus){//(calculatedTime > (expectingTime - timeThus)){
+        }else if(diff < (timeThus-prevTime)){//(calculatedTime > (expectingTime - timeThus)){
 
-            long diff = (expectedCurTime - timeThus);//calculatedTime - (expectingTime - timeThus);
-            testing = "expTime: " + expectedCurTime + " expTime:  " + expectingTime + " timeThus: "
-                    + timeThus + " diff: " + diff;
+            // increase time to (stopwatch) because bus is decreasing its speed (it will take longer to reach now)
+
+            long stopWatchChange = diff - (timeThus-prevTime);
+            testing = "prevExpectedTime: " + prevTimeLeft + " expTime:  " + timeLeft + " timeThus: "
+                    + timeThus + " real diff: " + diff;
             Toast.makeText(this,"Bus is running Late .... " + testing,Toast.LENGTH_LONG).show();
 
 
-        }else if(expectedCurTime < timeThus){//(calculatedTime < (expectingTime - timeThus)){
+        }else if(diff > (timeThus-prevTime)){//(calculatedTime < (expectingTime - timeThus)){
 
-            long diff = ( timeThus - expectedCurTime );//(expectingTime - timeThus) - calculatedTime;
-            testing = "expTime: " + expectedCurTime  + " expTime:  " + expectingTime + " timeThus: "
-                    + timeThus + " diff: " + diff;
+            // decrease time to (stopwatch) because bus is increasing its speed (will reach faster)
+
+            long stopWatchChange = diff - (timeThus-prevTime);
+            testing = "prevExpectedTime: " + prevTimeLeft + " expTime:  " + timeLeft + " timeThus: "
+                    + timeThus + " real diff: " + diff;
             Toast.makeText(this,"Bus is ahead of schedule .... " + testing,Toast.LENGTH_LONG).show();
 
         }
+
         expectedTime = timeLeft;//calculatedTime;
         //prevDistTrav = curDisTrav;
     }
@@ -177,6 +204,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         for(int i = 0 ; i < routeList.size(); i++){
             if(routeList.get(i).getBusNumber() == numEntered){
+
+                routeDistance = routeList.get(i).getDistance();
+                /*
                 if(routeList.get(i).getTimeThus() == 0){
                     startTime = routeList.get(i).getCurrentTime();
                     busStartLat = new BigDecimal(routeList.get(i).getPoints().getLatti());
@@ -191,9 +221,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }else if(routeList.get(i).getTimeThus() == 3){
                     busEndLat = new BigDecimal(routeList.get(i).getPoints().getLatti());
                     busEndLongi = new BigDecimal(routeList.get(i).getPoints().getLongi());
-                }
+                }*/
 
             }
+        }
+
+        final List<Integer> fleetList = new ArrayList<>();
+
+        for (int j = 0 ; j < scheduleList.size(); j++){
+            if(scheduleList.get(j).getBusNumber() == numEntered) { // and scheduleList.get(j).getEndtime > currentTime
+                fleetList.add(scheduleList.get(j).getFleetNumber());
+            }
+
         }
 
 
@@ -210,17 +249,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 for(DataSnapshot displacementSnapshot : dataSnapshot.getChildren()){
 
                     Displacements displacement = displacementSnapshot.getValue(Displacements.class);
+                    for (int x : fleetList){
+                        if((displacement.getBusNumber() == numEntered) && (displacement.getFleetNumber() == x )){
 
-                    if (displacement.getBusNumber() == numEntered) {
 
+                            lat = new BigDecimal(displacement.getPoints().getLatti());
+                            lon = new BigDecimal(displacement.getPoints().getLongi());
+                            textView1.setText("latitude = " + lat + " longitude =  " + lon);
 
-                        lat = new BigDecimal(displacement.getPoints().getLatti());
-                        lon = new BigDecimal(displacement.getPoints().getLongi());
-                        textView1.setText("latitude = " + lat + " longitude =  " + lon);
-
-                        displacementsList.add(displacement);
+                            displacementsList.add(displacement);
+                        }
                     }
-
                 }
 
                 //DisplacementList adapter = new DisplacementList(MainActivity.this,displacementsList);
@@ -253,10 +292,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         busCurAvgSpeed = speedSum / (k);
                     }
 
+                    /*
                     routeDistance = (Haversine.distance(busStartLat, busStartLongi, busMid1Lat, busMid1Longi)+
                                     Haversine.distance(busMid1Lat, busMid1Longi, busMid2Lat, busMid2Longi)+
                                     Haversine.distance(busMid2Lat, busMid2Longi, busEndLat, busEndLongi) );
 
+*/
                     //currentDistanceTravelled = Haversine.distance(busStartLat, busStartLongi, lat, lon);
                     //prevDistTrav = Haversine.distance(busStartLat, busStartLongi, new BigDecimal(displacementsList.get(k - 2).getPoints().getLatti()), new BigDecimal(displacementsList.get(k - 2).getPoints().getLongi()));
 
@@ -264,14 +305,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     long prevTime = displacementsList.get(k - 2).getTimeThus();
 
                     // expectedTime is calculated in function --> isBenifitting() but is initialized as zero.
-                    if ((expectedTime == 0) && (busCurAvgSpeed != 0)) {
-                        expectedTime = (long) (routeDistance / busCurAvgSpeed);
-                    }else if ((expectedTime == 0) && (busCurAvgSpeed != 0)){
+                    /*if (expectedTime == 0){
                         expectedTime = (long) (routeDistance / SPEED_LIMIT);
-                    }
-
-                    //busExpectedArrivalTime = (long) (routeDistance / SPEED_LIMIT);
-                    isBefitting(prevDistTrav, routeDistance, expectedTime, timeTravelledThus, prevTime, currentDistanceTravelled, busCurAvgSpeed);
+                    }*/
+                    isBefitting(prevDistTrav, routeDistance, timeTravelledThus, prevTime, currentDistanceTravelled, busCurAvgSpeed);
                     outputString = "Bus is on the move";
                 }
             }
